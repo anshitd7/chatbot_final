@@ -5,7 +5,8 @@ from groq import Groq
 
 def get_intent_and_entities(user_message):
     try:
-        # 1. Secure Connection
+        # 1. Connect to Groq (Cloud API)
+        # We do this INSIDE the function to prevent crashes if secrets aren't loaded yet
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
             print("⚠️ Error: GROQ_API_KEY is missing.")
@@ -13,45 +14,48 @@ def get_intent_and_entities(user_message):
             
         client = Groq(api_key=api_key)
         
-        # 2. Context for the AI
+        # 2. Get Context
         today = date.today()
-        today_str = today.strftime("%Y-%m-%d")
+        today_str = today.strftime("%Y-%m-%d") # e.g. "2024-04-24"
         current_year = today.year
         
-        # 3. THE UPGRADED PROMPT
+        # 3. The "Brain" Instructions (Prompt)
         prompt = f"""
-        You are a smart API that extracts INTENT and ENTITIES.
+        You are a smart API that extracts JSON data from sports queries.
         
         CONTEXT:
         - Current Date: {today_str}
         - Current Year: {current_year}
         
-        --- STEP 1: DETERMINE INTENT ---
-        - "count_academies": If user asks "how many", "total", "stats", "count".
-        - "check_slots": If user mentions "slot", "booking", "available", or a specific date.
-        - "get_address": If user asks for "address", "where is".
-        - "find_centres": Default for "near me", "list academies", "closest".
+        --- RULES ---
+        1. INTENT: 
+           - "count_academies" -> If user asks "how many", "total", "stats".
+           - "check_slots" -> If user asks for "slots", "booking", "available", or mentions a specific date.
+           - "get_address" -> If user asks for "address", "location".
+           - "find_centres" -> Default for "near me", "nearby", "list".
 
-        --- STEP 2: EXTRACT ENTITIES ---
-        - DATE: Must be YYYY-MM-DD format.
-          * Convert "24th April" -> "{current_year}-04-24"
-          * Convert "Today" -> "{today_str}"
-          * If no date is found, return null.
-        - TARGET_NAME: Specific academy names only. "Near me" is NOT a name.
-        - LIMIT: Integer only.
-        
-        --- FEW-SHOT EXAMPLES (Do exactly this!) ---
+        2. DATE HANDLING (CRITICAL):
+           - Convert words like "Today", "Tomorrow" to YYYY-MM-DD.
+           - Convert "24th April" or "24/04" to "{current_year}-04-24".
+           - If the user says "24th April 2024", return "2024-04-24".
+           - Return null if no date is mentioned.
+
+        3. TARGET_NAME:
+           - Extract specific names (e.g. "YMCA", "Black Dragon").
+           - IGNORE generic words like "near me", "academy".
+
+        --- EXAMPLES ---
         Query: "How many academies total?"
         JSON: {{ "intent": "count_academies", "date": null, "target_name": null, "limit": null }}
-        
-        Query: "slots for 24th April"
-        JSON: {{ "intent": "check_slots", "date": "{current_year}-04-24", "target_name": null, "limit": null }}
 
+        Query: "slots for 24th April?"
+        JSON: {{ "intent": "check_slots", "date": "{current_year}-04-24", "target_name": null, "limit": null }}
+        
         Query: "academies near me"
         JSON: {{ "intent": "find_centres", "date": null, "target_name": null, "limit": 5 }}
 
-        --- YOUR TASK ---
-        User Query: "{user_message}"
+        --- USER QUERY ---
+        "{user_message}"
         
         Return JSON object only.
         """
@@ -66,5 +70,5 @@ def get_intent_and_entities(user_message):
         
     except Exception as e:
         print(f"LLM Error: {e}")
-        # Safe fallback
+        # Fallback to Discovery if AI fails
         return {"intent": "find_centres", "limit": 5}

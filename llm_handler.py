@@ -3,45 +3,45 @@ import json
 from datetime import date
 from groq import Groq
 
-# REMOVED: client = Groq(...) from here. 
-# We don't want it to run immediately!
-
 def get_intent_and_entities(user_message):
-    # ADDED: Initialize the client INSIDE the function
-    # This ensures secrets are loaded before we try to connect
     try:
+        # Check if key exists before connecting
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
-            print("⚠️ Error: GROQ_API_KEY is missing.")
+            print("⚠️ Error: GROQ_API_KEY is missing from secrets.")
             return {"intent": "find_centres", "limit": 5}
             
+        # Connect to Groq now
         client = Groq(api_key=api_key)
         
         today_str = date.today().strftime("%Y-%m-%d")
         
+        # --- IMPROVED PROMPT WITH EXAMPLES ---
         prompt = f"""
-        You are a strict entity extractor.
+        You are a strict entity extractor API. 
         Current Date: {today_str}
         
-        Task: Extract INTENT, DATE, TIME, TARGET_NAME, and LIMIT.
+        Task: Extract INTENT, DATE, TIME, TARGET_NAME, and LIMIT from the User Query.
         
-        Rules:
-        1. INTENT: "check_slots", "find_centres" (for general search), "get_address", "count_academies".
-        2. TARGET_NAME: The specific name of the academy (e.g. "YMCA", "Black Dragon"). 
-           *** CRITICAL: DO NOT extract generic location words like "near me", "nearby", "closest", "around here", "center", "academy" as the target_name. ***
-           If the user says "academies near me", target_name must be null.
-        3. LIMIT: Integer only. 
+        --- RULES ---
+        1. INTENT: "check_slots", "find_centres", "get_address", "count_academies".
+        2. DATE: Must be in "YYYY-MM-DD" format. 
+           - Convert "today", "tomorrow", "next friday" to actual dates based on Current Date.
+           - Convert "24th April", "April 24", "24/04" to "2024-04-24" (Use current year 2024 unless specified).
+           - If no date is found, return null.
+        3. TARGET_NAME: Specific academy names only (e.g. "YMCA"). Generic words like "near me" = null.
         
+        --- EXAMPLES ---
+        Query: "slots for 24th april?"
+        Result: {{ "intent": "check_slots", "date": "2024-04-24", "target_name": null, "limit": null, "time": null }}
+        
+        Query: "academies near me"
+        Result: {{ "intent": "find_centres", "date": null, "target_name": null, "limit": 5, "time": null }}
+
+        --- ACTUAL QUERY ---
         User Query: "{user_message}"
         
-        Return JSON only:
-        {{
-          "intent": "string",
-          "date": "YYYY-MM-DD" or null,
-          "time": "HH:MM" or null,
-          "limit": integer or null,
-          "target_name": "string" or null
-        }}
+        Return JSON object only.
         """
         
         completion = client.chat.completions.create(

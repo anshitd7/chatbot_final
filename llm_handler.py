@@ -5,43 +5,47 @@ from groq import Groq
 
 def get_intent_and_entities(user_message):
     try:
+        # 1. Secure Connection
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
+            print("⚠️ Error: GROQ_API_KEY is missing.")
             return {"intent": "find_centres", "limit": 5}
             
         client = Groq(api_key=api_key)
+        
+        # 2. Context for the AI
         today = date.today()
         today_str = today.strftime("%Y-%m-%d")
         current_year = today.year
         
-        # --- STRICTER PROMPT ---
+        # 3. THE UPGRADED PROMPT
         prompt = f"""
-        You are a smart API that extracts Intent and Entities from sports queries.
+        You are a smart API that extracts INTENT and ENTITIES.
         
         CONTEXT:
         - Current Date: {today_str}
         - Current Year: {current_year}
         
-        --- 1. DETERMINE INTENT ---
+        --- STEP 1: DETERMINE INTENT ---
         - "count_academies": If user asks "how many", "total", "stats", "count".
-        - "check_slots": If user mentions "slot", "booking", "available", or a specific date/time.
-        - "get_address": If user asks for "address", "where is", "location of [Specific Name]".
+        - "check_slots": If user mentions "slot", "booking", "available", or a specific date.
+        - "get_address": If user asks for "address", "where is".
         - "find_centres": Default for "near me", "list academies", "closest".
 
-        --- 2. EXTRACT ENTITIES ---
-        - DATE: Must be YYYY-MM-DD. 
+        --- STEP 2: EXTRACT ENTITIES ---
+        - DATE: Must be YYYY-MM-DD format.
           * Convert "24th April" -> "{current_year}-04-24"
-          * Convert "tomorrow" -> (Calculate based on {today_str})
-          * If year is missing, use {current_year}.
-        - TARGET_NAME: Specific academy name only (e.g. "Black Dragon"). "Near me" is NOT a name.
-        - TIME: HH:MM format (24hr).
+          * Convert "Today" -> "{today_str}"
+          * If no date is found, return null.
+        - TARGET_NAME: Specific academy names only. "Near me" is NOT a name.
+        - LIMIT: Integer only.
         
-        --- FEW-SHOT EXAMPLES (Follow These!) ---
+        --- FEW-SHOT EXAMPLES (Do exactly this!) ---
         Query: "How many academies total?"
         JSON: {{ "intent": "count_academies", "date": null, "target_name": null, "limit": null }}
         
-        Query: "slot available on 24th april 2024?"
-        JSON: {{ "intent": "check_slots", "date": "2024-04-24", "target_name": null, "limit": null }}
+        Query: "slots for 24th April"
+        JSON: {{ "intent": "check_slots", "date": "{current_year}-04-24", "target_name": null, "limit": null }}
 
         Query: "academies near me"
         JSON: {{ "intent": "find_centres", "date": null, "target_name": null, "limit": 5 }}
@@ -49,7 +53,7 @@ def get_intent_and_entities(user_message):
         --- YOUR TASK ---
         User Query: "{user_message}"
         
-        Return the JSON object only.
+        Return JSON object only.
         """
         
         completion = client.chat.completions.create(
@@ -62,4 +66,5 @@ def get_intent_and_entities(user_message):
         
     except Exception as e:
         print(f"LLM Error: {e}")
+        # Safe fallback
         return {"intent": "find_centres", "limit": 5}

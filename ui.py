@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import geocoder 
-from services.centre_service import find_nearby_centres, find_centre_by_name, get_total_academy_count
+from services.center_service import find_nearby_centres, find_centre_by_name, get_total_academy_count
 from services.slot_service import get_available_slots
 from llm_handler import get_intent_and_entities
 from datetime import datetime, timedelta

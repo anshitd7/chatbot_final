@@ -7,6 +7,16 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="TIDA Sports", page_icon="🎾", layout="centered")
 
+import os
+
+# --- SECRET BRIDGE: Connect Streamlit Secrets to Your Code ---
+# This takes the passwords from the Streamlit box and gives them to your DB code
+if "env" in st.secrets:
+    for key, value in st.secrets["env"].items():
+        os.environ[key] = str(value)
+# -------------------------------------------------------------
+
+# ... rest of your code (st.set_page_config, etc.) starts here ...
 # Initialize Session State
 if "user_lat" not in st.session_state:
     st.session_state.user_lat = 30.7570

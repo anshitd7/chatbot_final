@@ -5,7 +5,7 @@ import geocoder
 # --- CONFIGURATION ---
 # 🔴 REPLACE THIS with your actual Railway App URL after deployment
 # Example: "https://web-production-1234.up.railway.app/chat"
-API_URL = "https://YOUR-RAILWAY-APP-URL.up.railway.app/chat"
+API_URL = "strong-communication-production-b242.up.railway.app"
 
 st.set_page_config(page_title="TIDA Sports", page_icon="🎾", layout="centered")
 

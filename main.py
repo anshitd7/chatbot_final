@@ -7,7 +7,7 @@ from services.center_service import find_nearby_centres, find_centre_by_name, ge
 from services.slot_service import get_available_slots
 
 app = FastAPI()
-
+#
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

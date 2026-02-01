@@ -1,25 +1,22 @@
 import streamlit as st
+import os
 import geocoder 
-from services.center_service import find_nearby_centres, find_centre_by_name, get_total_academy_count
+from services.centre_service import find_nearby_centres, find_centre_by_name, get_total_academy_count
 from services.slot_service import get_available_slots
 from llm_handler import get_intent_and_entities
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="TIDA Sports", page_icon="🎾", layout="centered")
-
-import os
-
-# --- SECRET BRIDGE: Connect Streamlit Secrets to Your Code ---
-# This takes the passwords from the Streamlit box and gives them to your DB code
+# --- 1. SECRET BRIDGE (Connects Streamlit Secrets to Code) ---
+# This MUST be at the top so your database can find the password
 if "env" in st.secrets:
     for key, value in st.secrets["env"].items():
         os.environ[key] = str(value)
-# -------------------------------------------------------------
 
-# ... rest of your code (st.set_page_config, etc.) starts here ...
-# Initialize Session State
+st.set_page_config(page_title="TIDA Sports", page_icon="🎾", layout="centered")
+
+# --- 2. SESSION STATE ---
 if "user_lat" not in st.session_state:
-    st.session_state.user_lat = 30.7570
+    st.session_state.user_lat = 30.7570  # Default to Chandigarh/Mohali
 if "user_lng" not in st.session_state:
     st.session_state.user_lng = 76.7800
 if "messages" not in st.session_state:
@@ -27,7 +24,7 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": "Hi there! 👋 How can I help you play today?"}
     ]
 
-# --- HELPER: FORMAT TIME RANGES ---
+# --- 3. HELPER FUNCTIONS ---
 def format_time_ranges(slots):
     if not slots: return "No slots"
     sorted_slots = sorted(slots, key=lambda x: x['raw_start'])
@@ -48,8 +45,8 @@ def format_time_ranges(slots):
     ranges.append(f"{range_start.strftime('%I:%M %p')} - {range_end.strftime('%I:%M %p')}")
     return ", ".join(ranges)
 
-# --- DIRECT LOGIC HANDLER (No API needed) ---
 def process_user_message(message, lat, lng):
+    # This replaces the "Backend API" - it runs the logic directly here
     ai_data = get_intent_and_entities(message)
     intent = ai_data.get("intent")
     req_date = ai_data.get("date")
@@ -58,11 +55,11 @@ def process_user_message(message, lat, lng):
     req_limit = ai_data.get("limit")
     limit = int(req_limit) if req_limit else 5
 
-    # CASE: Stats
+    # STATS
     if intent == "count_academies":
         return f"📊 **System Status**\nActive Academies: **{get_total_academy_count()}**"
 
-    # CASE: Address
+    # ADDRESS
     if intent == "get_address" or (target_name and "address" in message.lower()):
         if target_name and target_name.lower() in ['near me', 'nearby', 'closest']:
             target_name = None
@@ -72,7 +69,7 @@ def process_user_message(message, lat, lng):
             return f"📍 **{result['post_title']}**\n{result['address']}"
         return "❌ Academy not found. Try asking for 'academies near me'."
 
-    # CASE: Check Slots
+    # CHECK SLOTS
     if intent == "check_slots" or req_date or "slot" in message.lower():
         if not req_date:
             return "📅 **Date Needed**\nPlease specify a date (e.g., Today, Tomorrow)."
@@ -104,7 +101,7 @@ def process_user_message(message, lat, lng):
                  return f"✅ **{academy['post_title']}**\n**Open:** {time_str}"
 
         else:
-            # Broad Search
+            # BROAD SEARCH
             centres = find_nearby_centres(lat, lng, radius=60, limit=limit)
             if not centres:
                 return "🚫 No academies found within 60km."
@@ -131,7 +128,7 @@ def process_user_message(message, lat, lng):
                  return f"⚠️ Fully booked nearby for {pretty_date}."
             return "\n\n".join(report_blocks)
 
-    # CASE: General Discovery
+    # DISCOVERY (Default)
     centres = find_nearby_centres(lat, lng, radius=60, limit=limit)
     if not centres:
         return "No academies found nearby."
@@ -140,23 +137,25 @@ def process_user_message(message, lat, lng):
     list_items = [f"📍 **{c['post_title']}**\n   {c['address']} ({round(c['distance'], 1)} km)" for c in centres]
     return header + "\n\n".join(list_items)
 
-# --- SIDEBAR & LOCATION ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
     st.header("📍 Your Location")
-    if st.button("📍 Use My Current Location"):
+    st.info("ℹ️ Cloud servers are in the USA. For accurate results, please enter your local coordinates below.")
+    
+    st.number_input("Latitude", key="user_lat", format="%.4f")
+    st.number_input("Longitude", key="user_lng", format="%.4f")
+    
+    if st.button("📍 Try Auto-Detect (Server IP)"):
         try:
             g = geocoder.ip('me')
             if g.latlng:
                 st.session_state.user_lat = float(g.latlng[0])
                 st.session_state.user_lng = float(g.latlng[1])
-                st.success(f"Found: {g.city}")
+                st.success(f"Detected: {g.city}")
         except:
             st.error("Location failed.")
-            
-    st.number_input("Lat", key="user_lat", format="%.4f")
-    st.number_input("Lng", key="user_lng", format="%.4f")
 
-# --- CHAT UI ---
+# --- 5. CHAT UI ---
 st.title("🎾 TIDA Sports Assistant")
 
 for msg in st.session_state.messages:
@@ -170,10 +169,26 @@ def ask_bot(prompt):
     
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            # CALL FUNCTION DIRECTLY - NO API REQUEST
-            reply = process_user_message(prompt, st.session_state.user_lat, st.session_state.user_lng)
-            st.markdown(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
+            try:
+                # Direct function call (No API request needed)
+                reply = process_user_message(prompt, st.session_state.user_lat, st.session_state.user_lng)
+                st.markdown(reply)
+                st.session_state.messages.append({"role": "assistant", "content": reply})
+            except Exception as e:
+                error_msg = f"⚠️ Error: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
+# --- 6. BUTTONS (Restored!) ---
+st.write("") 
+cols = st.columns(3)
+if cols[0].button("📅 Slots for Today"):
+    ask_bot("Check slots for today")
+if cols[1].button("📍 Academies Near Me"):
+    ask_bot("Find academies near me")
+if cols[2].button("📊 Stats"):
+    ask_bot("How many academies total?")
+
+# --- 7. CHAT INPUT ---
 if user_input := st.chat_input("Type your question..."):
     ask_bot(user_input)

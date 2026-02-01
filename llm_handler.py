@@ -5,43 +5,51 @@ from groq import Groq
 
 def get_intent_and_entities(user_message):
     try:
-        # Check if key exists before connecting
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
-            print("⚠️ Error: GROQ_API_KEY is missing from secrets.")
             return {"intent": "find_centres", "limit": 5}
             
-        # Connect to Groq now
         client = Groq(api_key=api_key)
+        today = date.today()
+        today_str = today.strftime("%Y-%m-%d")
+        current_year = today.year
         
-        today_str = date.today().strftime("%Y-%m-%d")
-        
-        # --- IMPROVED PROMPT WITH EXAMPLES ---
+        # --- STRICTER PROMPT ---
         prompt = f"""
-        You are a strict entity extractor API. 
-        Current Date: {today_str}
+        You are a smart API that extracts Intent and Entities from sports queries.
         
-        Task: Extract INTENT, DATE, TIME, TARGET_NAME, and LIMIT from the User Query.
+        CONTEXT:
+        - Current Date: {today_str}
+        - Current Year: {current_year}
         
-        --- RULES ---
-        1. INTENT: "check_slots", "find_centres", "get_address", "count_academies".
-        2. DATE: Must be in "YYYY-MM-DD" format. 
-           - Convert "today", "tomorrow", "next friday" to actual dates based on Current Date.
-           - Convert "24th April", "April 24", "24/04" to "2024-04-24" (Use current year 2024 unless specified).
-           - If no date is found, return null.
-        3. TARGET_NAME: Specific academy names only (e.g. "YMCA"). Generic words like "near me" = null.
-        
-        --- EXAMPLES ---
-        Query: "slots for 24th april?"
-        Result: {{ "intent": "check_slots", "date": "2024-04-24", "target_name": null, "limit": null, "time": null }}
-        
-        Query: "academies near me"
-        Result: {{ "intent": "find_centres", "date": null, "target_name": null, "limit": 5, "time": null }}
+        --- 1. DETERMINE INTENT ---
+        - "count_academies": If user asks "how many", "total", "stats", "count".
+        - "check_slots": If user mentions "slot", "booking", "available", or a specific date/time.
+        - "get_address": If user asks for "address", "where is", "location of [Specific Name]".
+        - "find_centres": Default for "near me", "list academies", "closest".
 
-        --- ACTUAL QUERY ---
+        --- 2. EXTRACT ENTITIES ---
+        - DATE: Must be YYYY-MM-DD. 
+          * Convert "24th April" -> "{current_year}-04-24"
+          * Convert "tomorrow" -> (Calculate based on {today_str})
+          * If year is missing, use {current_year}.
+        - TARGET_NAME: Specific academy name only (e.g. "Black Dragon"). "Near me" is NOT a name.
+        - TIME: HH:MM format (24hr).
+        
+        --- FEW-SHOT EXAMPLES (Follow These!) ---
+        Query: "How many academies total?"
+        JSON: {{ "intent": "count_academies", "date": null, "target_name": null, "limit": null }}
+        
+        Query: "slot available on 24th april 2024?"
+        JSON: {{ "intent": "check_slots", "date": "2024-04-24", "target_name": null, "limit": null }}
+
+        Query: "academies near me"
+        JSON: {{ "intent": "find_centres", "date": null, "target_name": null, "limit": 5 }}
+
+        --- YOUR TASK ---
         User Query: "{user_message}"
         
-        Return JSON object only.
+        Return the JSON object only.
         """
         
         completion = client.chat.completions.create(

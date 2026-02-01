@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+mysql-connector-python
+groq
+requests
+streamlit
+geocoder
+pydantic

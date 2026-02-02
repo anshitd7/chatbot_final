@@ -46,15 +46,14 @@ def format_time_ranges(slots):
     return ", ".join(ranges)
 
 def process_user_message(message, lat, lng):
-    # This replaces the "Backend API" - it runs the logic directly here
     ai_data = get_intent_and_entities(message)
     
-    # --- ADD THIS DEBUG LINE HERE ---
-    st.write(f"🧠 **AI DEBUG:** {ai_data}") 
-    # --------------------------------
+    # Debug line (You can keep this to see what the brain is doing!)
+    st.write(f"🧠 **AI DEBUG:** {ai_data}")
     
-    intent = ai_data.get("intent")
-    # ... rest of the code ...
+    # --- FIX: Accept either "intent" OR "action" ---
+    intent = ai_data.get("intent") or ai_data.get("action")
+    
     req_date = ai_data.get("date")
     req_time = ai_data.get("time") 
     target_name = ai_data.get("target_name")
@@ -63,7 +62,9 @@ def process_user_message(message, lat, lng):
 
     # STATS
     if intent == "count_academies":
-        return f"📊 **System Status**\nActive Academies: **{get_total_academy_count()}**"
+        # We ignore the AI's "15" guess and ask the REAL database
+        real_count = get_total_academy_count()
+        return f"📊 **System Status**\nActive Academies: **{real_count}**"
 
     # ADDRESS
     if intent == "get_address" or (target_name and "address" in message.lower()):

@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timedelta
 
 # --- CRASH-PROOF IMPORT ---
-# This prevents the "ModuleNotFoundError" crash
 try:
     from streamlit_js_eval import get_geolocation
     GPS_AVAILABLE = True
@@ -37,11 +36,9 @@ def format_time_ranges(slots):
     if not slots: return "No slots"
     sorted_slots = sorted(slots, key=lambda x: x['raw_start'])
     if not sorted_slots: return ""
-    
     ranges = []
     range_start = sorted_slots[0]['raw_start']
     last_slot_start = sorted_slots[0]['raw_start']
-    
     for i in range(1, len(sorted_slots)):
         current = sorted_slots[i]['raw_start']
         if (current - last_slot_start).total_seconds() == 3600:
@@ -51,23 +48,21 @@ def format_time_ranges(slots):
             ranges.append(f"{range_start.strftime('%I:%M %p')} - {range_end.strftime('%I:%M %p')}")
             range_start = current
             last_slot_start = current
-            
     range_end = last_slot_start + timedelta(hours=1)
     ranges.append(f"{range_start.strftime('%I:%M %p')} - {range_end.strftime('%I:%M %p')}")
     return ", ".join(ranges)
 
 # --- LOGIC HANDLER ---
-def process_user_message(message, lat, lng):
+def process_user_message(message, lat, lng, search_radius, user_limit):
     ai_data = get_intent_and_entities(message)
     
-    # Check both 'intent' and 'action' (Fixes Stats Bug)
     intent = ai_data.get("intent") or ai_data.get("action")
-    
     req_date = ai_data.get("date")
     req_time = ai_data.get("time") 
     target_name = ai_data.get("target_name")
-    req_limit = ai_data.get("limit")
-    limit = int(req_limit) if req_limit else 5
+    
+    # PRIORITY: User Sidebar Limit overrides AI limit
+    limit = user_limit
 
     # STATS
     if intent == "count_academies":
@@ -117,9 +112,9 @@ def process_user_message(message, lat, lng):
 
         else:
             # BROAD SEARCH
-            centres = find_nearby_centres(lat, lng, radius=300, limit=limit)
+            centres = find_nearby_centres(lat, lng, radius=search_radius, limit=limit)
             if not centres:
-                return "🚫 No academies found within 60km."
+                return f"🚫 No academies found within {search_radius}km."
 
             report_blocks = [f"### 🗓️ Availability for {pretty_date}\n"]
             any_found = False
@@ -144,18 +139,28 @@ def process_user_message(message, lat, lng):
             return "\n\n".join(report_blocks)
 
     # DISCOVERY
-    centres = find_nearby_centres(lat, lng, radius=300, limit=limit)
+    centres = find_nearby_centres(lat, lng, radius=search_radius, limit=limit)
     if not centres:
-        return "No academies found nearby."
+        return f"No academies found within {search_radius}km."
     
     header = f"Here are the **{len(centres)}** closest academies:\n\n"
     list_items = [f"📍 **{c['post_title']}**\n   {c['address']} ({round(c['distance'], 1)} km)" for c in centres]
     return header + "\n\n".join(list_items)
 
-# --- SIDEBAR & GPS ---
+# --- SIDEBAR CONTROL PANEL ---
 with st.sidebar:
-    st.header("📍 Your Location")
+    st.header("⚙️ Settings")
     
+    # 1. Search Radius Slider
+    search_radius = st.slider("Search Radius (km)", 10, 500, 300)
+    
+    # 2. Result Limit Slider (NEW!)
+    result_limit = st.slider("Max Results to Show", 1, 20, 5)
+    
+    st.divider()
+    
+    # 3. Location Controls
+    st.subheader("📍 Your Location")
     if GPS_AVAILABLE:
         if st.checkbox("📍 Get Real Browser Location"):
             loc = get_geolocation()
@@ -164,7 +169,7 @@ with st.sidebar:
                 st.session_state.user_lng = loc['coords']['longitude']
                 st.success("✅ Location Updated!")
     else:
-        st.warning("⚠️ GPS Library missing. Add 'streamlit-js-eval' to requirements.txt to fix.")
+        st.warning("⚠️ GPS Library missing. Update requirements.txt.")
             
     st.number_input("Lat", key="user_lat", format="%.4f")
     st.number_input("Lng", key="user_lng", format="%.4f")
@@ -184,7 +189,14 @@ def ask_bot(prompt):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                reply = process_user_message(prompt, st.session_state.user_lat, st.session_state.user_lng)
+                # Pass both settings to the function
+                reply = process_user_message(
+                    prompt, 
+                    st.session_state.user_lat, 
+                    st.session_state.user_lng, 
+                    search_radius, 
+                    result_limit
+                )
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
             except Exception as e:

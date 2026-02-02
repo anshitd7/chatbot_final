@@ -6,21 +6,17 @@ import streamlit as st
 
 def get_intent_and_entities(user_message):
     try:
-        # 1. Check API Key
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
-            st.error("CRITICAL ERROR: GROQ_API_KEY is missing from Secrets!")
+            st.error("⚠️ Error: GROQ_API_KEY is missing.")
             return {"intent": "find_centres", "limit": 5}
             
-        # 2. Connect to Groq
         client = Groq(api_key=api_key)
         
-        # 3. Context
         today = date.today()
         today_str = today.strftime("%Y-%m-%d")
         current_year = today.year
         
-        # 4. Strict Prompt
         prompt = f"""
         You are a smart API. Extract JSON data.
         CONTEXT: Current Date: {today_str}, Year: {current_year}
@@ -33,7 +29,6 @@ def get_intent_and_entities(user_message):
         
         DATE RULES:
         - Convert "24th April" to "{current_year}-04-24".
-        - Convert "Today" to "{today_str}".
         
         QUERY: "{user_message}"
         
@@ -41,7 +36,7 @@ def get_intent_and_entities(user_message):
         """
         
         completion = client.chat.completions.create(
-            # UPDATED MODEL NAME HERE:
+            # --- CRITICAL FIX: NEW MODEL NAME ---
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
@@ -50,5 +45,6 @@ def get_intent_and_entities(user_message):
         return json.loads(completion.choices[0].message.content)
         
     except Exception as e:
+        # This will show you the error in red box if it fails again
         st.error(f"⚠️ AI BRAIN FAILURE: {str(e)}")
         return {"intent": "find_centres", "limit": 5}

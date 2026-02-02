@@ -6,11 +6,11 @@ def find_nearby_centres(lat, lng, radius=60, limit=5):
         with conn.cursor(dictionary=True) as cursor:
             safe_limit = int(limit) if limit else 5
             
-            # We use DISTINCT because the table has multiple rows (bookings) for the same academy
+            # UPDATED QUERY: Uses GROUP BY to prevent duplicates
             query = """
-            SELECT DISTINCT
+            SELECT 
                 academy_name as post_title,
-                address,
+                MIN(address) as address, 
                 latitude,
                 longitude,
                 (
@@ -22,6 +22,7 @@ def find_nearby_centres(lat, lng, radius=60, limit=5):
                     )
                 ) AS distance
             FROM academy_master 
+            GROUP BY academy_name, latitude, longitude
             HAVING distance < %s
             ORDER BY distance ASC
             LIMIT %s; 

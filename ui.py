@@ -117,7 +117,7 @@ def process_user_message(message, lat, lng):
 
         else:
             # BROAD SEARCH
-            centres = find_nearby_centres(lat, lng, radius=60, limit=limit)
+            centres = find_nearby_centres(lat, lng, radius=300, limit=limit)
             if not centres:
                 return "🚫 No academies found within 60km."
 
@@ -144,7 +144,7 @@ def process_user_message(message, lat, lng):
             return "\n\n".join(report_blocks)
 
     # DISCOVERY
-    centres = find_nearby_centres(lat, lng, radius=60, limit=limit)
+    centres = find_nearby_centres(lat, lng, radius=300, limit=limit)
     if not centres:
         return "No academies found nearby."
     

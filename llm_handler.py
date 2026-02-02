@@ -2,7 +2,7 @@ import os
 import json
 from datetime import date
 from groq import Groq
-import streamlit as st  # Imported to show errors on screen
+import streamlit as st
 
 def get_intent_and_entities(user_message):
     try:
@@ -41,7 +41,8 @@ def get_intent_and_entities(user_message):
         """
         
         completion = client.chat.completions.create(
-            model="llama3-8b-8192",
+            # UPDATED MODEL NAME HERE:
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
             response_format={"type": "json_object"}
@@ -49,6 +50,5 @@ def get_intent_and_entities(user_message):
         return json.loads(completion.choices[0].message.content)
         
     except Exception as e:
-        # THIS IS THE FIX: Print the actual error to the screen!
         st.error(f"⚠️ AI BRAIN FAILURE: {str(e)}")
         return {"intent": "find_centres", "limit": 5}

@@ -6,23 +6,24 @@ def find_nearby_centres(lat, lng, radius=60, limit=5):
         with conn.cursor(dictionary=True) as cursor:
             safe_limit = int(limit) if limit else 5
             
-            # UPDATED QUERY: Uses GROUP BY to prevent duplicates
+            # UPDATED: Group BY NAME ONLY. 
+            # We take the first address and average location to merge duplicates.
             query = """
             SELECT 
                 academy_name as post_title,
                 MIN(address) as address, 
-                latitude,
-                longitude,
+                AVG(latitude) as latitude,
+                AVG(longitude) as longitude,
                 (
                     6371 * acos(
                         LEAST(1.0, GREATEST(-1.0,
-                            cos(radians(%s)) * cos(radians(latitude)) * cos(radians(longitude) - radians(%s)) + 
-                            sin(radians(%s)) * sin(radians(latitude))
+                            cos(radians(%s)) * cos(radians(AVG(latitude))) * cos(radians(AVG(longitude)) - radians(%s)) + 
+                            sin(radians(%s)) * sin(radians(AVG(latitude)))
                         ))
                     )
                 ) AS distance
             FROM academy_master 
-            GROUP BY academy_name, latitude, longitude
+            GROUP BY academy_name
             HAVING distance < %s
             ORDER BY distance ASC
             LIMIT %s; 
@@ -31,7 +32,6 @@ def find_nearby_centres(lat, lng, radius=60, limit=5):
             return cursor.fetchall()
     finally:
         conn.close()
-
 def find_centre_by_name(name_query):
     conn = get_db_connection()
     try:

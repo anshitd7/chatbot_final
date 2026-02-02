@@ -48,7 +48,13 @@ def format_time_ranges(slots):
 def process_user_message(message, lat, lng):
     # This replaces the "Backend API" - it runs the logic directly here
     ai_data = get_intent_and_entities(message)
+    
+    # --- ADD THIS DEBUG LINE HERE ---
+    st.write(f"🧠 **AI DEBUG:** {ai_data}") 
+    # --------------------------------
+    
     intent = ai_data.get("intent")
+    # ... rest of the code ...
     req_date = ai_data.get("date")
     req_time = ai_data.get("time") 
     target_name = ai_data.get("target_name")

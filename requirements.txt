@@ -6,3 +6,4 @@ requests
 streamlit
 geocoder
 pydantic
+streamlit-js-eval

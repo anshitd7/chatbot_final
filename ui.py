@@ -1,9 +1,14 @@
 import streamlit as st
 import os
 from datetime import datetime, timedelta
-# --- NEW LIBRARY FOR REAL GPS ---
-from streamlit_js_eval import get_geolocation 
 
+# --- CRASH-PROOF IMPORT ---
+# This prevents the "ModuleNotFoundError" crash
+try:
+    from streamlit_js_eval import get_geolocation
+    GPS_AVAILABLE = True
+except ImportError:
+    GPS_AVAILABLE = False
 
 from services.center_service import find_nearby_centres, find_centre_by_name, get_total_academy_count
 from services.slot_service import get_available_slots
@@ -31,9 +36,9 @@ if "messages" not in st.session_state:
 def format_time_ranges(slots):
     if not slots: return "No slots"
     sorted_slots = sorted(slots, key=lambda x: x['raw_start'])
-    ranges = []
     if not sorted_slots: return ""
     
+    ranges = []
     range_start = sorted_slots[0]['raw_start']
     last_slot_start = sorted_slots[0]['raw_start']
     
@@ -55,7 +60,7 @@ def format_time_ranges(slots):
 def process_user_message(message, lat, lng):
     ai_data = get_intent_and_entities(message)
     
-    # --- STATS FIX: Check both 'intent' and 'action' ---
+    # Check both 'intent' and 'action' (Fixes Stats Bug)
     intent = ai_data.get("intent") or ai_data.get("action")
     
     req_date = ai_data.get("date")
@@ -64,12 +69,12 @@ def process_user_message(message, lat, lng):
     req_limit = ai_data.get("limit")
     limit = int(req_limit) if req_limit else 5
 
-    # CASE: STATS
+    # STATS
     if intent == "count_academies":
         real_count = get_total_academy_count()
         return f"📊 **System Status**\nActive Academies: **{real_count}**"
 
-    # CASE: ADDRESS
+    # ADDRESS
     if intent == "get_address" or (target_name and "address" in message.lower()):
         if target_name and target_name.lower() in ['near me', 'nearby', 'closest']:
             target_name = None
@@ -79,7 +84,7 @@ def process_user_message(message, lat, lng):
             return f"📍 **{result['post_title']}**\n{result['address']}"
         return "❌ Academy not found. Try asking for 'academies near me'."
 
-    # CASE: CHECK SLOTS
+    # CHECK SLOTS
     if intent == "check_slots" or req_date or "slot" in message.lower():
         if not req_date:
             return "📅 **Date Needed**\nPlease specify a date (e.g., Today, Tomorrow)."
@@ -138,7 +143,7 @@ def process_user_message(message, lat, lng):
                  return f"⚠️ Fully booked nearby for {pretty_date}."
             return "\n\n".join(report_blocks)
 
-    # CASE: DISCOVERY (Default)
+    # DISCOVERY
     centres = find_nearby_centres(lat, lng, radius=60, limit=limit)
     if not centres:
         return "No academies found nearby."
@@ -151,14 +156,15 @@ def process_user_message(message, lat, lng):
 with st.sidebar:
     st.header("📍 Your Location")
     
-    # --- NEW REAL GPS CHECKBOX ---
-    if st.checkbox("📍 Get Real Browser Location"):
-        # This prompts the browser for permission
-        loc = get_geolocation()
-        if loc:
-            st.session_state.user_lat = loc['coords']['latitude']
-            st.session_state.user_lng = loc['coords']['longitude']
-            st.success("✅ Location Updated!")
+    if GPS_AVAILABLE:
+        if st.checkbox("📍 Get Real Browser Location"):
+            loc = get_geolocation()
+            if loc:
+                st.session_state.user_lat = loc['coords']['latitude']
+                st.session_state.user_lng = loc['coords']['longitude']
+                st.success("✅ Location Updated!")
+    else:
+        st.warning("⚠️ GPS Library missing. Add 'streamlit-js-eval' to requirements.txt to fix.")
             
     st.number_input("Lat", key="user_lat", format="%.4f")
     st.number_input("Lng", key="user_lng", format="%.4f")
@@ -194,6 +200,5 @@ if cols[1].button("📍 Academies Near Me"):
 if cols[2].button("📊 Stats"):
     ask_bot("How many academies total?")
 
-# --- INPUT ---
 if user_input := st.chat_input("Type your question..."):
     ask_bot(user_input)
